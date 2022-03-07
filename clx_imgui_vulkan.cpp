@@ -1,12 +1,15 @@
 #include "clx_imgui_vulkan.hpp"
 
 #include <algorithm>
+#include <assert.h>
 
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 
 #include <vulkan/vulkan_command_buffer_utils.hpp>
+#include <vulkan/vulkan_descriptor_pool.hpp>
+#include <vulkan/vulkan_render_pass.hpp>
 #include <vulkan/vulkan_window.hpp>
 
 #ifndef NDEBUG
@@ -24,12 +27,12 @@ VkAllocationCallbacks* allocator_;
 VkDescriptorPool descriptor_pool_;
 VkDevice device_;
 VkQueue queue_;
-// TODO: change to a weak ptr and do checks to see if the window was destroyed?
-std::shared_ptr<cl::vulkan::VulkanWindow> vulkan_window_;
+// Maybe this should be a weak_ptr but calling lock() multiple times every frame is expensive and I really hate doing it
+cl::vulkan::VulkanWindow* vulkan_window_;
 
 void OnBindRenderTarget(const std::shared_ptr<cl::RenderTarget>& render_target) {
   auto vulkan_window = std::dynamic_pointer_cast<cl::vulkan::VulkanWindow>(render_target);
-  vulkan_window_ = vulkan_window;
+  vulkan_window_ = vulkan_window.get();
   allocator_ = vulkan_window->GetAllocator();
   device_ = vulkan_window->GetDevice();
   queue_ = vulkan_window->GetGraphicsQueue();
@@ -38,38 +41,31 @@ void OnBindRenderTarget(const std::shared_ptr<cl::RenderTarget>& render_target) 
 
   // I have absolutely no idea why imgui doesn't just allocate its own descriptor pool under the hood
   VkDescriptorPoolSize pool_sizes[] = {
-    { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+    { VK_DESCRIPTOR_TYPE_SAMPLER,                1000 },
     { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-    { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-    { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-    { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+    { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1000 },
+    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1000 },
+    { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1000 },
+    { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1000 },
+    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1000 },
+    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1000 },
     { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
     { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-    { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1000 }
   };
   VkDescriptorPoolCreateInfo pool_info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
   pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-  pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
-  pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+  pool_info.maxSets = 1000 * std::size(pool_sizes);
+  pool_info.poolSizeCount = (uint32_t)std::size(pool_sizes);
   pool_info.pPoolSizes = pool_sizes;
-  VK_CHECK(vkCreateDescriptorPool(device_, &pool_info, allocator_, &descriptor_pool_));
-
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO(); (void)io;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+  vkCreateDescriptorPool(device_, &pool_info, allocator_, &descriptor_pool_);
 
   ImGui::StyleColorsDark();
 
   ImGuiStyle& style = ImGui::GetStyle();
-  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-      style.WindowRounding = 0.0f;
-      style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+  if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    style.WindowRounding = 0.0f;
+    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
   }
 
   ImGui_ImplGlfw_InitForVulkan(vulkan_window->GetGlfwWindow(), true);
@@ -88,7 +84,8 @@ void OnBindRenderTarget(const std::shared_ptr<cl::RenderTarget>& render_target) 
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   init_info.Allocator = allocator_;
   init_info.CheckVkResultFn = [](VkResult err){ VK_CHECK(err); };
-  ImGui_ImplVulkan_Init(&init_info, vulkan_window->GetRenderPass());
+
+  ImGui_ImplVulkan_Init(&init_info, vulkan_window_->GetRenderPass());
 
   VkCommandBuffer command_buffer = cl::vulkan::BeginSingleUseCommandBuffer(vulkan_window->GetContextData());
   ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
@@ -108,13 +105,13 @@ void Cleanup() {
   vkDestroyDescriptorPool(device_, descriptor_pool_, allocator_);
 }
 
-void BeginFrame() {
+void Begin() {
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 }
 
-void EndFrame() {
+void End() {
   ImGui::Render();
   ImDrawData* main_draw_data = ImGui::GetDrawData();
   const bool main_is_minimized = (main_draw_data->DisplaySize.x <= 0.0f || main_draw_data->DisplaySize.y <= 0.0f);

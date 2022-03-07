@@ -21,15 +21,16 @@ void OnBindRenderTarget(const std::shared_ptr<cl::RenderTarget>& render_target) 
 void Cleanup() {
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
 }
 
-void BeginFrame() {
+void Begin() {
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 }
 
-void EndFrame() {
+void End() {
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   ImGuiIO& io = ImGui::GetIO();

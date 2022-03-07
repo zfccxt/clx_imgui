@@ -6,7 +6,7 @@ namespace clx::imgui::vulkan {
 
 void OnBindRenderTarget(const std::shared_ptr<cl::RenderTarget>& render_target);
 void Cleanup();
-void BeginFrame();
-void EndFrame();
+void Begin();
+void End();
 
 }

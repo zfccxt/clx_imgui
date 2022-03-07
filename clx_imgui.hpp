@@ -9,7 +9,7 @@ namespace clx::imgui {
 
 cl::ExtensionDetails LoadExtension();
 
-void BeginFrame();
-void EndFrame();
+void Begin();
+void End();
 
 }

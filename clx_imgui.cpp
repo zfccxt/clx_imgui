@@ -12,9 +12,7 @@ cl::Backend backend_;
 
 void Init(std::shared_ptr<cl::Context> context) {
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  io.ConfigFlags  |= ImGuiConfigFlags_ViewportsEnable;
-  io.ConfigFlags  |= ImGuiConfigFlags_DockingEnable;
+  ImGui::GetIO().ConfigFlags = ImGuiConfigFlags_DockingEnable;
 
   backend_ = context->GetBackend();
 }
@@ -32,29 +30,37 @@ void BindRenderTarget(const std::shared_ptr<cl::RenderTarget>& render_target) {
 }
 
 void Cleanup() {
-  ImGui::DestroyContext();
-}
-
-void BeginFrame() {
   switch (backend_) {
     case cl::Backend::kOpenGL:
-      clx::imgui::opengl::BeginFrame();
+      clx::imgui::opengl::Cleanup();
       break;
 
     case cl::Backend::kVulkan:
-      clx::imgui::vulkan::BeginFrame();
+      clx::imgui::vulkan::Cleanup();
       break;
   }
 }
 
-void EndFrame() {
+void Begin() {
   switch (backend_) {
     case cl::Backend::kOpenGL:
-      clx::imgui::opengl::EndFrame();
+      clx::imgui::opengl::Begin();
       break;
 
     case cl::Backend::kVulkan:
-      clx::imgui::vulkan::EndFrame();
+      clx::imgui::vulkan::Begin();
+      break;
+  }
+}
+
+void End() {
+  switch (backend_) {
+    case cl::Backend::kOpenGL:
+      clx::imgui::opengl::End();
+      break;
+
+    case cl::Backend::kVulkan:
+      clx::imgui::vulkan::End();
       break;
   }
 }
