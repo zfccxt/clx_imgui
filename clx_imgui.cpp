@@ -12,7 +12,8 @@ cl::Backend backend_;
 
 void Init(std::shared_ptr<cl::Context> context) {
   ImGui::CreateContext();
-  ImGui::GetIO().ConfigFlags = ImGuiConfigFlags_DockingEnable;
+  ImGui::GetIO().ConfigFlags  = ImGuiConfigFlags_None;
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
   backend_ = context->GetBackend();
 }
