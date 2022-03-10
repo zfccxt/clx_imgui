@@ -29,6 +29,7 @@ VkDevice device_;
 VkQueue queue_;
 // Maybe this should be a weak_ptr but calling lock() multiple times every frame is expensive and I really hate doing it
 cl::vulkan::VulkanWindow* vulkan_window_;
+bool prev_depth_test_enable_;
 
 void OnBindRenderTarget(const std::shared_ptr<cl::RenderTarget>& render_target) {
   auto vulkan_window = std::dynamic_pointer_cast<cl::vulkan::VulkanWindow>(render_target);
@@ -106,6 +107,9 @@ void Cleanup() {
 }
 
 void Begin() {
+  prev_depth_test_enable_ = vulkan_window_->IsDepthTestEnabled();
+  vulkan_window_->SetDepthTestEnable(false);
+
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
@@ -125,6 +129,8 @@ void End() {
     ImGui::UpdatePlatformWindows();
     ImGui::RenderPlatformWindowsDefault();
   }
+
+  vulkan_window_->SetDepthTestEnable(prev_depth_test_enable_);
 }
 
 #pragma warning(pop)
